@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import com.axway.apim.lib.AppException;
 import com.axway.apim.lib.CommandParameters;
 import com.axway.apim.lib.Utils;
+import com.axway.apim.swagger.APIManagerAdapter;
 import com.axway.apim.swagger.api.state.DesiredAPI;
 import com.axway.apim.swagger.api.state.IAPI;
 import com.fasterxml.jackson.core.JsonParseException;
@@ -57,14 +58,16 @@ public class APIDefintion {
 	private JsonNode parseContent(byte[] apiDefinitionContent) throws Exception {
 		
 		JsonNode swagger = null;
+		ObjectMapper jsonObjectMapper = null;
+		ObjectMapper yamlObjectMapper = null;
 		
 		try {
-			objectMapper = new ObjectMapper();
-			swagger = objectMapper.readTree(apiDefinitionContent);
+			jsonObjectMapper = new ObjectMapper();
+			swagger = jsonObjectMapper.readTree(apiDefinitionContent);
 		}
 		catch (JsonParseException jsonException) {
 			try {
-				ObjectMapper yamlObjectMapper = new ObjectMapper(APIDefintion.getYamlFactory());
+				yamlObjectMapper = new ObjectMapper(APIDefintion.getYamlFactory());
 				swagger = yamlObjectMapper.readTree(apiDefinitionContent);
 			}
 			catch (JsonParseException yamlException) {
@@ -74,6 +77,13 @@ public class APIDefintion {
 				LOG.error("Yaml parse error: ", yamlException);
 				throw new Exception("Could not parse API definition file - see error messages for details");
 			}
+		}
+		// Only use Yaml object mapper for writing changed API definition if we are at version 7.7 or higher.
+		if (yamlObjectMapper != null && APIManagerAdapter.hasAPIManagerVersion("7.7")) {
+			objectMapper = yamlObjectMapper;
+		}
+		else {
+			objectMapper = jsonObjectMapper;
 		}
 		return swagger;
 	}
