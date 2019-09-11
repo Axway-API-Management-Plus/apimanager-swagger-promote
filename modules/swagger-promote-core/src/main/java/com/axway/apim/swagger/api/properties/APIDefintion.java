@@ -21,12 +21,18 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 public class APIDefintion {
 	
+	public final int YAML = 1;
+	public final int JSON = 2;
+	public final int NOT_SWAGGER = 10;
+	
 	static Logger LOG = LoggerFactory.getLogger(APIDefintion.class);
 	
 	private String apiDefinitionFile = null;
 	
 	private byte[] apiDefinitionContent = null;
 
+	private int apiDefinitionFileType = NOT_SWAGGER;
+	
 	private ObjectMapper objectMapper = null;
 	
 	public APIDefintion() {
@@ -64,13 +70,16 @@ public class APIDefintion {
 		try {
 			jsonObjectMapper = new ObjectMapper();
 			swagger = jsonObjectMapper.readTree(apiDefinitionContent);
+			apiDefinitionFileType = JSON;
 		}
 		catch (JsonParseException jsonException) {
 			try {
 				yamlObjectMapper = new ObjectMapper(APIDefintion.getYamlFactory());
 				swagger = yamlObjectMapper.readTree(apiDefinitionContent);
+				apiDefinitionFileType = YAML;
 			}
 			catch (JsonParseException yamlException) {
+				apiDefinitionFileType = NOT_SWAGGER;
 				LOG.error("API definition file "  + (this.apiDefinitionFile  != null ? this.apiDefinitionFile : "<no name>" ) + 
 						" could not be parsed. File is not a valid Json or Yaml file - see details below.");
 				LOG.error("Json parse error: ", jsonException);
@@ -139,6 +148,10 @@ public class APIDefintion {
 					}
 					if(backendBasepathAdjusted) {
 						LOG.info("Used the configured backendBasepath: '"+importAPI.getBackendBasepath()+"' to adjust the Swagger definition.");
+						this.apiDefinitionContent = objectMapper.writeValueAsBytes(swagger);
+					}
+					else if (!APIManagerAdapter.hasAPIManagerVersion("7.7") && apiDefinitionFileType == YAML) {
+						LOG.info("Converting Yaml to Json as Yaml is not supported by this API Manager version!");
 						this.apiDefinitionContent = objectMapper.writeValueAsBytes(swagger);
 					}
 				}
