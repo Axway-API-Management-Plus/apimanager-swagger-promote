@@ -11,10 +11,12 @@ import com.axway.apim.lib.CommandParameters;
 import com.axway.apim.lib.Utils;
 import com.axway.apim.swagger.api.state.DesiredAPI;
 import com.axway.apim.swagger.api.state.IAPI;
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 public class APIDefintion {
 	
@@ -24,8 +26,19 @@ public class APIDefintion {
 	
 	private byte[] apiDefinitionContent = null;
 
+	private ObjectMapper objectMapper = null;
+	
 	public APIDefintion() {
 		
+	}
+	
+	private static YAMLFactory yamlFactory = null;
+	
+	private static YAMLFactory  getYamlFactory() {
+		if (APIDefintion.yamlFactory == null) {
+			APIDefintion.yamlFactory = new YAMLFactory();
+		}
+		return APIDefintion.yamlFactory;
 	}
 
 	public APIDefintion(byte[] apiDefinitionContent) {
@@ -40,6 +53,32 @@ public class APIDefintion {
 		this.apiDefinitionFile = apiDefinitionFile;
 	}
 
+	
+	private JsonNode parseContent(byte[] apiDefinitionContent) throws Exception {
+		
+		JsonNode swagger = null;
+		
+		try {
+			objectMapper = new ObjectMapper();
+			swagger = objectMapper.readTree(apiDefinitionContent);
+		}
+		catch (JsonParseException jsonException) {
+			try {
+				ObjectMapper yamlObjectMapper = new ObjectMapper(APIDefintion.getYamlFactory());
+				swagger = yamlObjectMapper.readTree(apiDefinitionContent);
+			}
+			catch (JsonParseException yamlException) {
+				LOG.error("API definition file "  + (this.apiDefinitionFile  != null ? this.apiDefinitionFile : "<no name>" ) + 
+						" could not be parsed. File is not a valid Json or Yaml file - see details below.");
+				LOG.error("Json parse error: ", jsonException);
+				LOG.error("Yaml parse error: ", yamlException);
+				throw new Exception("Could not parse API definition file - see error messages for details");
+			}
+		}
+		return swagger;
+	}
+	
+	
 	public void setAPIDefinitionContent(byte[] apiDefinitionContent, DesiredAPI importAPI) {
 		this.apiDefinitionContent = apiDefinitionContent;
 		try {
@@ -49,8 +88,10 @@ public class APIDefintion {
 					URL url = new URL(importAPI.getBackendBasepath());
 					String port = url.getPort()==-1 ? ":"+String.valueOf(url.getDefaultPort()) : ":"+String.valueOf(url.getPort());
 					if(port.equals(":443") || port.equals(":80")) port = "";
-					ObjectMapper objectMapper = new ObjectMapper();
-					JsonNode swagger = objectMapper.readTree(apiDefinitionContent);
+					
+					// parse content an initialize objectMapper variable
+					JsonNode swagger = parseContent(apiDefinitionContent);
+				  
 					if(swagger.get("host")==null) {
 						LOG.debug("Adding new host '"+url.getHost()+port+"' to Swagger-File based on configured backendBasepath: '"+importAPI.getBackendBasepath()+"'");
 						backendBasepathAdjusted = true;
@@ -88,8 +129,8 @@ public class APIDefintion {
 					}
 					if(backendBasepathAdjusted) {
 						LOG.info("Used the configured backendBasepath: '"+importAPI.getBackendBasepath()+"' to adjust the Swagger definition.");
+						this.apiDefinitionContent = objectMapper.writeValueAsBytes(swagger);
 					}
-					this.apiDefinitionContent = objectMapper.writeValueAsBytes(swagger);
 				}
 			}
 		} catch (Exception e) {
