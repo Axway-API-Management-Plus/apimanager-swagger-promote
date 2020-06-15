@@ -1,3 +1,10 @@
+![Project-Discontinued](https://img.shields.io/badge/Project-Discontinued-red)  
+
+# Swagger-Promote has been refactored into a new APIM-CLI, which is more powerful and supports more flexible use-cases.  
+
+Checkout the new API-Manager CLI:  
+https://github.com/Axway-API-Management-Plus/apim-cli
+
 # Swagger/WSDL based API promotion for Axway API-Manager V7
 
 This project provides you with a tool that simplifies your DevOps experience with the Axway API-Manager Version 7.x. 
